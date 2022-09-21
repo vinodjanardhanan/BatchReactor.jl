@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<batch>
+	<gasphase>CH4 H2O H2 CO CO2 O2 N2</gasphase>
+	<molefractions>CH4=0.25,H2O=0.25,N2=0.5</molefractions>
+	<T>1073.15</T>
+	<p>1e5</p>
+	<Asv>10</Asv>
+	<time>10</time>
+</batch>
