@@ -121,6 +121,11 @@ The meaning of different tags is specified below.
 - <surface_mech> : name of the surface reaction mechanism
 - <gas_mech> : name of the gasphase reaction mechanism
 
+
+## Input file download
+The xml input file and the *lib* directory containig other required input files may be downloaded from [here](https://github.com/vinodjanardhanan/BatchReactor.jl/tree/main/test).
+
+
 ## Output
 The code generates two output files in the same directory where the input file **`batch.xml`** is present. 
 The file **`gas_profile.dat`** contains the mole fraction of the gas phase species as a function of time.

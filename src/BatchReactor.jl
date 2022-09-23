@@ -43,6 +43,8 @@ This is the calling function for executing the batch reactor with user defined r
     batch_reactor(input_file::AbstractString, lib_dir::AbstractString, user_defined::Function; sens= false)    
 -   input_file: the xml input file for batch reactor
 -   lib_dir: the direcrtory in which the data files are present. It must be the relative path
+-   user_defined : a function that calculates the species source terms. Must be supplied by the user
+-   sens : Boolean to be set as true when used along with the sensitivity code
 """
 function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, user_defined::Function; sens= false)    
     chem = Chemistry(false, false, true, user_defined)
@@ -56,14 +58,28 @@ This is the calling function for executing the batch reactor with chemistry inpu
 batch_reactor(input_file::AbstractString, lib_dir::AbstractString; sens= false, surfchem=false, gaschem=false)
 -   input_file: the xml input file for batch reactor
 -   lib_dir: the direcrtory in which the data files are present. It must be the relative path
+-   sens : Boolean to be set as true when used along with the sensitivity code
+-   surfchem : Boolean to specify the calculation of surface reaction rates 
+-   gaschem : Boolean to specify the calculation of gasphase reaction rates 
 """
 function batch_reactor(input_file::AbstractString, lib_dir::AbstractString; sens= false, surfchem=false, gaschem=false)
     chem = Chemistry(surfchem, gaschem, false, f->())
     batch_reactor(input_file, lib_dir, sens, chem)
 end
 
+
+
 """
 A function for call from other packages, mainly intended for reactor network modeling
+# Usage
+batch_reactor(inlet_comp, T, p, time; Asv=1.0, chem, thermo_obj, md)
+-   inlet_comp : A dictionary of species and its mole fractions at the reactor inlet 
+-   T : operating temperature (K)
+-   p : operating pressure (Pa) 
+-   time : integration time (s)   
+-   Asv : Surface area to volume ratio (important in the case of surface reactions. 1 in the case of gasphase chemistry)
+-   thermo_obj : Species thermo object (Please refer IdealGas package documentation)
+-   md : MechanismDefinition (Please refer to ReactionCommons documentation)
 """
 function batch_reactor(inlet_comp, T, p, time; Asv=1.0, chem, thermo_obj, md)
 
@@ -192,10 +208,10 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
 end
 
 
-"""
+#=
 Function for creating the solition vector. 
     The solution vector contains mass density of the species ie. ρ × Y_k    
-"""
+=#
 function get_solution_vector(id::InputData, chem)
     soln = zeros(length(id.gasphase))
     molefrac_to_massfrac!(soln,id.mole_fracs,id.thermo_obj.molwt)
@@ -207,9 +223,9 @@ function get_solution_vector(id::InputData, chem)
 end
 
 
-"""
+#=
 Function for reading the common input parameters
-"""
+=#
 function input_data(xmlroot::XMLElement, lib_dir::AbstractString, chem)
 
 
@@ -279,9 +295,9 @@ function input_data(xmlroot::XMLElement, lib_dir::AbstractString, chem)
 end
 
 
-"""
+#=
 Residual function definition for the batch reactor
-"""
+=#
 function residual!(du,u,p,t)        
     state = 1
     thermo_obj = 2
@@ -328,9 +344,9 @@ end
 
 
 
-"""
+#=
 Function to save the variables into output file
-"""
+=#
 function save_data(u,t,integrator)
     state = 1
     g_stream, s_stream = o_streams

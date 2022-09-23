@@ -11,17 +11,20 @@ using IdealGas, RxnHelperUtils, SurfaceReactions, GasphaseReactions, ReactionCom
     end
 
     @testset "Testing surface chemistry" begin        
-        retcode = batch_reactor("batch_surf/batch.xml", lib_dir, surfchem=true)
+        input_file = joinpath("batch_surf", "batch.xml")
+        retcode = batch_reactor(input_file, lib_dir, surfchem=true)
         @test retcode == Symbol("Success")
     end
 
     @testset "Testing gas chemistry of h2 + o2" begin
-        retcode = batch_reactor("batch_h2o2/batch.xml", lib_dir, gaschem=true)
+        input_file = joinpath("batch_h2o2", "batch.xml")
+        retcode = batch_reactor(input_file, lib_dir, gaschem=true)
         @test retcode == Symbol("Success")
     end
 
     @testset "Testing gas chemistry using grimech" begin
-        retcode = batch_reactor("batch_ch4/batch.xml", lib_dir, gaschem=true)
+        input_file = joinpath("batch_ch4", "batch.xml")
+        retcode = batch_reactor(input_file, lib_dir, gaschem=true)
         @test retcode == Symbol("Success")
     end
 
@@ -62,7 +65,8 @@ using IdealGas, RxnHelperUtils, SurfaceReactions, GasphaseReactions, ReactionCom
         function udf(state)
             state.source[1:end] .= 0.0            
         end
-        retcode = batch_reactor("batch_udf/batch.xml", lib_dir, udf)
+        input_file = joinpath("batch_udf", "batch.xml")
+        retcode = batch_reactor(input_file, lib_dir, udf)
         @test retcode == Symbol("Success")        
     end
 end
