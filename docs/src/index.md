@@ -3,7 +3,7 @@ CurrentModule = BatchReactor
 ```
 
 # BatchReactor
-Batch reactor is a package for simulating plug flow reactor with detailed surface  or gasphase chemistry. Additionally you may use user defined function for the calculation of reaction rates. 
+Batch reactor is a package for simulating batch reactor with detailed surface  or gasphase chemistry. Additionally you may use user defined function for the calculation of reaction rates. 
 
 Documentation for [BatchReactor](https://github.com/vinodjanardhanan/BatchReactor.jl).
 
@@ -41,23 +41,23 @@ Here $\rho_k$ is the mass density of species $k$ defined as $\rho Y_k$, where $Y
 ## Surface chemistry
 For solving a surface chemistry problem: On the Julia REPL 
 ```julia
-julia>using Plug
-julia>plug("batch.xml","lib/", surfchem=true)
+julia>using BatchReactor
+julia>batch_reactor("batch.xml","lib/", surfchem=true)
 ```
 ## Gasphase chemistry
 For solving a gasphase chemistry problem: On the Julia REPL 
 ```julia
-julia>using Plug
-julia>plug("batch.xml", "lib/", gaschem=true)
+julia>using BatchReactor
+julia>batch_reactor("batch.xml", "lib/", gaschem=true)
 ```
 
-In the above calls, it is assumed that the input file *plug.xml* is present in the working directory and *../lib/* is the path to the *lib* directory relative to the current working directory. The function can be called from any directory and in that case the first argument must point to the *plug.xml* file relative to the current working directory. The output files will be generated in the directory where *plug.xml* is present. In general the function takes three optional keyword arguments *gaschem*, *surfchem*, and *sens*. *gaschem* must be true to simulate gasphase chemistry, *surfchem* must be true for surface chemistry, and *sens* must be true whenever sensitivity analysis is performed. 
+In the above calls, it is assumed that the input file *batch.xml* is present in the working directory and *../lib/* is the path to the *lib* directory relative to the current working directory. The function can be called from any directory and in that case the first argument must point to the *batch.xml* file relative to the current working directory. The output files will be generated in the directory where *batch.xml* is present. In general the function takes three optional keyword arguments *gaschem*, *surfchem*, and *sens*. *gaschem* must be true to simulate gasphase chemistry, *surfchem* must be true for surface chemistry, and *sens* must be true whenever sensitivity analysis is performed. 
 
 ## User defined chemistry
 For solving the model with user defined chemistry: On the Julia REPL 
 ```julia
-julia>using Plug, ReactionCommons
-julia>plug("batch.xml", "lib/", udf)
+julia>using BatchReactor, ReactionCommons
+julia>batch_reactor("batch.xml", "lib/", udf)
 ```
 *udf* is a function having the following signature
 ```
