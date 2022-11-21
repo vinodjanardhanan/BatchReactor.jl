@@ -274,7 +274,7 @@ function input_data(xmlroot::XMLElement, lib_dir::AbstractString, chem)
     #get the mechanism file if surface chemistry is involked 
     if chem.surfchem
         mech_file = get_text_from_xml(xmlroot,"surface_mech")
-        mech_file = lib_dir*"/"*mech_file
+	mech_file = get_path(lib_dir, mech_file) 
         #create the mechanism definition
         md = SurfaceReactions.compile_mech(mech_file,thermo_obj,gasphase)
         id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,md)
