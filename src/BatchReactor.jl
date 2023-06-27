@@ -4,7 +4,7 @@ using LightXML, Printf
 using Sundials, DifferentialEquations
 using IdealGas, GasphaseReactions, SurfaceReactions, ReactionCommons, RxnHelperUtils
 
-include("Constants.jl")
+#include("Constants.jl")
 
 
 export batch_reactor
@@ -204,7 +204,7 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
     close(g_stream)
     close(s_stream)    
 
-    return sol.retcode
+    return Symbol(sol.retcode)
 end
 
 
@@ -315,7 +315,7 @@ function residual!(du,u,p,t)
     #average molecular weight
     mlwt_avg = average_molwt(p[state].mole_frac,p[thermo_obj].molwt)
     #pressure update
-    p[state].p = ρ*R*p[cp].T/mlwt_avg
+    p[state].p = ρ*RxnHelperUtils.R*p[cp].T/mlwt_avg
         
     
     #calculate the molar production rates in case of surface chemistry 
