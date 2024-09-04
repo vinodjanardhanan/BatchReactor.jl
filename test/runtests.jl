@@ -10,7 +10,7 @@ using IdealGas, RxnHelperUtils, SurfaceReactions, GasphaseReactions, ReactionCom
         lib_dir = "lib\\"
     end
 
-    @testset "Testing surface chemistry" begin        
+     @testset "Testing surface chemistry" begin        
         input_file = joinpath("batch_surf", "batch.xml")
         retcode = batch_reactor(input_file, lib_dir, surfchem=true)
         @test retcode == Symbol("Success")
@@ -27,7 +27,7 @@ using IdealGas, RxnHelperUtils, SurfaceReactions, GasphaseReactions, ReactionCom
         retcode = batch_reactor(input_file, lib_dir, gaschem=true)
         @test retcode == Symbol("Success")
     end
-
+ 
     @testset "Testing surface chemistry with interface call " begin
         inlet_comp = Dict("CH4"=>0.25,"H2O"=>0.0, "H2"=>0.0, "CO"=>0.0, "CO2"=>0.25, "O2"=>0.0, "N2"=>0.5)
         T = 1073.15
@@ -68,5 +68,5 @@ using IdealGas, RxnHelperUtils, SurfaceReactions, GasphaseReactions, ReactionCom
         input_file = joinpath("batch_udf", "batch.xml")
         retcode = batch_reactor(input_file, lib_dir, udf)
         @test retcode == Symbol("Success")        
-    end
+    end 
 end

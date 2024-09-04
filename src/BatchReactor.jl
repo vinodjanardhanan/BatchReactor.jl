@@ -165,10 +165,14 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
     # g_stream = open("gas_profile.dat","w")
     g_stream = open(output_file(input_file, "gas_profile.dat"),"w")
     s_stream = open(output_file(input_file, "surface_covg.dat"),"w")  
-    global o_streams = (g_stream, s_stream)  
+    csv_g_stream = open(output_file(input_file, "gas_profile.csv"),"w")
+    csv_s_stream = open(output_file(input_file, "surface_covg.csv"),"w")  
+    global o_streams = (g_stream, s_stream, csv_g_stream, csv_s_stream)  
     create_header(g_stream,["t","T","p","rho"],id.gasphase)
+    write_csv(csv_g_stream,["t","T","p","rho"],id.gasphase)
     if chem.surfchem
         create_header(s_stream,"t", "T" ,id.md.sm.species)
+        write_csv(csv_s_stream,"t", "T" ,id.md.sm.species)
     end
 
     #define the Parameters
@@ -203,7 +207,8 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
     
     close(g_stream)
     close(s_stream)    
-
+    close(csv_g_stream)
+    close(csv_s_stream)
     return Symbol(sol.retcode)
 end
 
@@ -349,12 +354,14 @@ Function to save the variables into output file
 =#
 function save_data(u,t,integrator)
     state = 1
-    g_stream, s_stream = o_streams
+    g_stream, s_stream, csv_g_stream, csv_s_stream = o_streams
     #density 
     ρ = sum(u[1:length(integrator.p[state].mole_frac)])
     write_to_file(g_stream,t,integrator.p[state].T,integrator.p[state].p,ρ,integrator.p[state].mole_frac)
+    write_csv(csv_g_stream,t,integrator.p[state].T,integrator.p[state].p,ρ,integrator.p[state].mole_frac)
     if integrator.p[end].surfchem
         write_to_file(s_stream,t,integrator.p[state].T,integrator.p[state].covg)   
+        write_csv(csv_s_stream,t,integrator.p[state].T,integrator.p[state].covg)   
     end
     @printf("%4e\n",t) 
 end

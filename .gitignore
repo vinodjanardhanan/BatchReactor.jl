@@ -8,3 +8,7 @@ run
 /test/batch_ch4/*.dat
 /test/batch_h2o2/*.dat
 /test/batch_udf/*.dat
+/test/batch_surf/*.csv
+/test/batch_ch4/*.csv
+/test/batch_h2o2/*.csv
+/test/batch_udf/*.csv
