@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<batch>
+	<molefractions>CH4=0.25,O2=0.5,N2=0.25</molefractions>
+	<T>1173.</T>
+	<p>1e5</p>
+	<time>10</time>
+	<gas_mech>grimech.dat</gas_mech>
+	<surface_mech>ch4ni.xml</surface_mech>
+</batch>

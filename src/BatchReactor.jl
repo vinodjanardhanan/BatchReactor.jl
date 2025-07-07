@@ -1,7 +1,7 @@
 module BatchReactor
 
 using LightXML, Printf
-using Sundials, DifferentialEquations
+using DifferentialEquations, Sundials
 using IdealGas, GasphaseReactions, SurfaceReactions, ReactionCommons, RxnHelperUtils
 
 #include("Constants.jl")
@@ -33,7 +33,9 @@ struct InputData
     gasphase::Array{String,1}
     mole_fracs::Array{Float64,1}
     thermo_obj::SurfaceReactions.IdealGas.SpeciesThermoObj
-    md::MechanismDefinition
+    gmd::Union{MechanismDefinition, Nothing}
+    smd::Union{MechanismDefinition, Nothing} 
+    umd::Union{MechanismDefinition, Nothing} 
 end
 
 
@@ -108,7 +110,7 @@ function batch_reactor(inlet_comp, T, p, time; Asv=1.0, chem, thermo_obj, md)
         source = zeros(n_species)
         all_conc = zeros(n_species)
         sr_state = SurfaceRxnState(T, p, mole_fracs, covg, surf_conc, rxn_rate, source, all_conc)        
-        params = (sr_state, thermo_obj, md, cp, chem)        
+        params = (s_state = sr_state, thermo = thermo_obj, smd = md, cp = cp, chem = chem)        
         
     end
 
@@ -121,7 +123,7 @@ function batch_reactor(inlet_comp, T, p, time; Asv=1.0, chem, thermo_obj, md)
         Kp = zeros(length(md.gm.reactions))
         rxn_rate = zeros(length(Kp))
         gs_state = GasphaseState(T, p, mole_fracs, conc, rxn_rate, source, g_all, Kp)
-        params = (gs_state, thermo_obj, md, cp,  chem)
+        params = (g_state = gs_state, thermo = thermo_obj, gmd =  md, cp =  cp,  chem = chem)
     end
 
     #create the solution vector
@@ -132,9 +134,11 @@ function batch_reactor(inlet_comp, T, p, time; Asv=1.0, chem, thermo_obj, md)
         append!(soln, covg)
     end
 
+    
+    alg = CVODE_BDF()
     t_span = (0,time)
     prob = ODEProblem(residual!,soln,t_span,params)
-    sol = solve(prob, CVODE_BDF(), reltol=1e-6, abstol=1e-10, save_everystep=false);        
+    sol = solve(prob, alg , reltol=1e-6, abstol=1e-10, save_everystep=false);        
     mass_fracs = sol.u[end][1:length(species)] ./ sum(sol.u[end][1:length(species)])
     mole_fracs = zeros(length(mass_fracs))
     massfrac_to_molefrac!(mole_fracs, mass_fracs, thermo_obj.molwt)
@@ -155,7 +159,7 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
     # calculate the total number of species    
     n_species = length(id.gasphase) 
     if chem.surfchem
-        n_species += length(id.md.sm.species)
+        n_species += length(id.smd.sm.species)
     end
     #storage for species source terms
     source = zeros(n_species)
@@ -171,38 +175,38 @@ function batch_reactor(input_file::AbstractString, lib_dir::AbstractString, sens
     create_header(g_stream,["t","T","p","rho"],id.gasphase)
     write_csv(csv_g_stream,["t","T","p","rho"],id.gasphase)
     if chem.surfchem
-        create_header(s_stream,"t", "T" ,id.md.sm.species)
-        write_csv(csv_s_stream,"t", "T" ,id.md.sm.species)
+        create_header(s_stream,"t", "T" ,id.smd.sm.species)
+        write_csv(csv_s_stream,"t", "T" ,id.smd.sm.species)
     end
 
     #define the Parameters
     cp = ConstantParams(id.Asv, id.T) 
+    sr_state = gr_state = ur_state = nothing
     
-    if chem.surfchem
-        surf_conc = similar(id.md.sm.si.ini_covg)
-        rxn_rate = zeros(length(id.md.sm.reactions))        
-        state = SurfaceRxnState(id.T, id.p_initial, id.mole_fracs, id.md.sm.si.ini_covg, surf_conc, rxn_rate, source, all_conc)
+    if chem.surfchem 
+        surf_conc = similar(id.smd.sm.si.ini_covg)
+        rxn_rate = zeros(length(id.smd.sm.reactions))        
+        sr_state = SurfaceRxnState(id.T, id.p_initial, id.mole_fracs, id.smd.sm.si.ini_covg, surf_conc, rxn_rate, source, all_conc)
     end
     if chem.gaschem
-        Kp = zeros(length(id.md.gm.reactions)) # Non allocating memory or the calculation of equilibrium constant 
+        Kp = zeros(length(id.gmd.gm.reactions)) # Non allocating memory or the calculation of equilibrium constant 
         rxn_rate = zeros(length(Kp)) # Non allocating memory for the calculation of individual reactions 
         g_all = similar(id.mole_fracs) # Non allocating memory for the calculation of Gibb's free energy 
-        state = GasphaseState(id.T, id.p_initial, id.mole_fracs, all_conc, rxn_rate, source, g_all, Kp)
+        gr_state = GasphaseState(id.T, id.p_initial, id.mole_fracs, all_conc, rxn_rate, source, g_all, Kp)
     end
-
     if chem.userchem && ! chem.surfchem && !chem.gaschem
         source = zeros(length(id.mole_fracs))         
-        state = UserDefinedState(id.T, id.p_initial, id.mole_fracs, id.thermo_obj.molwt, id.gasphase, source)
+        ur_state = UserDefinedState(id.T, id.p_initial, id.mole_fracs, id.thermo_obj.molwt, id.gasphase, source)
     end
-
-    t_span = (0,id.tf)
-    params = (state, id.thermo_obj, id.md, cp, chem)
+    t_span = (0,id.tf)    
+    
+    params = (s_state = sr_state, g_state = gr_state, u_state = ur_state, thermo = id.thermo_obj, smd = id.smd, gmd = id.gmd, cp = cp, chem= chem)
     prob = ODEProblem(residual!,soln,t_span,params)
     if sens == true
         return (params, prob,t_span)
     end
     cb = FunctionCallingCallback(save_data)
-    # sol = solve(prob,alg_hints=[:stiff] , reltol=1e-6, abstol = 1e-8, save_everystep=false, callback=cb)
+    # sol = solve(prob, reltol=1e-6, abstol = 1e-8, save_everystep=false, callback=cb)
     sol = solve(prob, CVODE_BDF(), reltol=1e-6, abstol=1e-10, save_everystep=false,callback=cb);        
     
     close(g_stream)
@@ -222,7 +226,7 @@ function get_solution_vector(id::InputData, chem)
     molefrac_to_massfrac!(soln,id.mole_fracs,id.thermo_obj.molwt)
     soln .*= density(id.mole_fracs,id.thermo_obj.molwt,id.T,id.p_initial)
     if chem.surfchem
-        append!(soln,id.md.sm.si.ini_covg)    
+        append!(soln,id.smd.sm.si.ini_covg)    
     end
     return soln
 end
@@ -249,14 +253,13 @@ function input_data(xmlroot::XMLElement, lib_dir::AbstractString, chem)
         mech_file = get_path(lib_dir, mech_file)  
         gmd = compile_gaschemistry(mech_file)
         gasphase = gmd.gm.species
-    end 
-
-    # If gasphase chemistry is not present, then get the gasphase species from xml
-    if !chem.gaschem
+    else # If gasphase chemistry is not present, then get the gasphase species from xml
         #get the gasphase present
         gasphase = Array{String,1}
-        gasphase = get_collection_from_xml(xmlroot,"gasphase")
-    end
+        gasphase = get_collection_from_xml(xmlroot,"gasphase")    
+        gmd = nothing
+    end 
+
     
     # create the thermo object 
     thermo_obj = IdealGas.create_thermo(gasphase, thermo_file)
@@ -279,20 +282,23 @@ function input_data(xmlroot::XMLElement, lib_dir::AbstractString, chem)
     #get the mechanism file if surface chemistry is involked 
     if chem.surfchem
         mech_file = get_text_from_xml(xmlroot,"surface_mech")
-	mech_file = get_path(lib_dir, mech_file) 
+	    mech_file = get_path(lib_dir, mech_file) 
         #create the mechanism definition
-        md = SurfaceReactions.compile_mech(mech_file,thermo_obj,gasphase)
-        id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,md)
+        smd = SurfaceReactions.compile_mech(mech_file,thermo_obj,gasphase)
+        # id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,gmd,smd)
+    elseif !chem.surfchem
+        smd = nothing
     end
+    
 
     # create the input data if Gasphase chemistry is invoked 
-    if chem.gaschem
-        id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,gmd)
+    if chem.gaschem || chem.surfchem
+        id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj, gmd, smd, nothing)
     end
 
     if chem.userchem
         um = UsrMech()
-        id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,um)
+        id = InputData(T,p_initial,Asv,tf,gasphase,mole_fracs,thermo_obj,gmd, smd, um)
     end
 
     return id
@@ -304,46 +310,68 @@ end
 Residual function definition for the batch reactor
 =#
 function residual!(du,u,p,t)        
-    state = 1
-    thermo_obj = 2
-    md = 3
-    cp = 4
-    ng = length(p[state].mole_frac)
-    
 
+    if p[:chem].surfchem && !p[:chem].gaschem
+        ng = length(p[:s_state].mole_frac)
+    elseif p[:chem].gaschem && !p[:chem].surfchem
+        ng = length(p[:g_state].mole_frac)
+    elseif p[:chem].gaschem && p[:chem].surfchem
+        ng = length(p[:g_state].mole_frac)
+    elseif p[:chem].userchem
+        ng = length(p[:u_state].mole_frac)
+    end
+    
+    
     #density 
     ρ = sum(u[1:ng])
     #mass fractions 
     mass_fracs = u[1:ng]/ρ
-    #mole fractions
-    massfrac_to_molefrac!(p[state].mole_frac,mass_fracs,p[thermo_obj].molwt)
-    #average molecular weight
-    mlwt_avg = average_molwt(p[state].mole_frac,p[thermo_obj].molwt)
-    #pressure update
-    p[state].p = ρ*RxnHelperUtils.R*p[cp].T/mlwt_avg
         
     
     #calculate the molar production rates in case of surface chemistry 
-    if p[end].surfchem
-        ns = length(p[md].sm.species)    
+    if p[:chem].surfchem 
+        #mole fractions
+        massfrac_to_molefrac!(p[:s_state].mole_frac,mass_fracs,p[:thermo].molwt)
+        #average molecular weight
+        mlwt_avg = average_molwt(p[:s_state].mole_frac,p[:thermo].molwt)
+        #pressure update
+        p[:s_state].p = ρ*RxnHelperUtils.R*p[:cp].T/mlwt_avg
+
+
+        ns = length(p[:smd].sm.species)    
         #coverage update
-        p[state].covg = u[ng+1:ng+ns]
-        SurfaceReactions.calculate_molar_production_rates!(p[state],p[thermo_obj],p[md])
-        p[state].source *= p[cp].Asv
-    end
-    if p[end].gaschem && !p[end].surfchem
-        GasphaseReactions.calculate_molar_production_rates!(p[state], p[md], p[thermo_obj])
+        p[:s_state].covg = u[ng+1:ng+ns]
+        SurfaceReactions.calculate_molar_production_rates!(p[:s_state],p[:thermo],p[:smd])
+        p[:s_state].source *= p[:cp].Asv
+    end    
+    if p[:chem].gaschem
+        #mole fractions
+        massfrac_to_molefrac!(p[:g_state].mole_frac,mass_fracs,p[:thermo].molwt)
+        #average molecular weight
+        mlwt_avg = average_molwt(p[:g_state].mole_frac,p[:thermo].molwt)
+        #pressure update
+        p[:g_state].p = ρ*RxnHelperUtils.R*p[:cp].T/mlwt_avg
+
+        GasphaseReactions.calculate_molar_production_rates!(p[:g_state], p[:gmd], p[:thermo])
     end
     
-    if p[end].userchem
-        p[end].udf(p[state])
+    if p[:chem].userchem
+        p[:chem].udf(p[:u_state])
     end
+
     #gasphase residual
-    du[1:ng] = (p[state].source[1:ng] .* p[thermo_obj].molwt)     
-    #coverage residuals in case of surface chemistry 
-    if p[end].surfchem
-        du[ng+1:ng+ns] = (p[state].source[ng+1:ng+ns] .* p[md].sm.si.site_coordination)/(p[md].sm.si.density*1e4)
+    if p[:chem].gaschem && !p[:chem].surfchem
+        du[1:ng] = (p[:g_state].source[1:ng] .* p[:thermo].molwt)     
+    elseif !p[:chem].gaschem && p[:chem].surfchem
+        du[1:ng] = (p[:s_state].source[1:ng] .* p[:thermo].molwt)     
+        du[ng+1:ng+ns] = (p[:s_state].source[ng+1:ng+ns] .* p[:smd].sm.si.site_coordination)/(p[:smd].sm.si.density*1e4)
+    elseif p[:chem].gaschem && p[:chem].surfchem
+        du[1:ng] = ( (p[:s_state].source[1:ng] .+ p[:g_state].source[1:ng]) .* p[:thermo].molwt)     
+        du[ng+1:ng+ns] = (p[:s_state].source[ng+1:ng+ns] .* p[:smd].sm.si.site_coordination)/(p[:smd].sm.si.density*1e4)
+    elseif p[:chem].userchem
+        du[1:ng] = (p[:u_state].source[1:ng] .* p[:thermo].molwt)     
     end
+
     
 end
 
@@ -353,15 +381,22 @@ end
 Function to save the variables into output file
 =#
 function save_data(u,t,integrator)
-    state = 1
+    
     g_stream, s_stream, csv_g_stream, csv_s_stream = o_streams
     #density 
-    ρ = sum(u[1:length(integrator.p[state].mole_frac)])
-    write_to_file(g_stream,t,integrator.p[state].T,integrator.p[state].p,ρ,integrator.p[state].mole_frac)
-    write_csv(csv_g_stream,t,integrator.p[state].T,integrator.p[state].p,ρ,integrator.p[state].mole_frac)
-    if integrator.p[end].surfchem
-        write_to_file(s_stream,t,integrator.p[state].T,integrator.p[state].covg)   
-        write_csv(csv_s_stream,t,integrator.p[state].T,integrator.p[state].covg)   
+    if integrator.p[:chem].surfchem 
+        state = integrator.p[:s_state]        
+    elseif integrator.p[:chem].gaschem
+        state = integrator.p[:g_state]
+    else
+        state = integrator.p[:u_state]
+    end
+    ρ = sum(u[1:length(state.mole_frac)])
+    write_to_file(g_stream,t,state.T,state.p,ρ,state.mole_frac)
+    write_csv(csv_g_stream,t,state.T,state.p,ρ,state.mole_frac)
+    if integrator.p[:chem].surfchem
+        write_to_file(s_stream,t,integrator.p[:s_state].T,integrator.p[:s_state].covg)   
+        write_csv(csv_s_stream,t,integrator.p[:s_state].T,integrator.p[:s_state].covg)   
     end
     @printf("%4e\n",t) 
 end
